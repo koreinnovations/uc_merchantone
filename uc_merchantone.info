@@ -1,5 +1,5 @@
-name = MerchantOne Payment Gateway
-description = Allows Ubercart to integrate with the MerchantOne payment gateway
+name = Merchant One Payment Gateway
+description = Allows Ubercart to integrate with the Merchant One payment gateway
 dependencies[] = uc_payment
 dependencies[] = uc_credit
 package = Ubercart - payment

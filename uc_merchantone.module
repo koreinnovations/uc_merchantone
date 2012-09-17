@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Processes payments using MerchantOne gateway.
+ * Processes payments using Merchant One gateway.
  *
  * Development sponsored by KoreMedia Productions - http://www.koremedia.net
  */
