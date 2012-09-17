@@ -102,6 +102,8 @@ function _uc_merchantone_charge($order, $amount, $data) {
   $billing_country = uc_get_country_data(array('country_id' => $order->billing_country));
   $delivery_country = uc_get_country_data(array('country_id' => $order->delivery_country));
 
+  dpm($order->payment_details);
+  
   // Build the POST data for the transaction.
   $submit_data = array(
       'payment' => 'creditcard',
