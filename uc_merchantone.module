@@ -19,9 +19,9 @@ function uc_merchantone_menu() {
 }
 
 /**
- * Implements hook_uc_payment_gateway().
+ * Implements hook_payment_gateway().
  */
-function uc_merchantone_uc_payment_gateway() {
+function uc_merchantone_payment_gateway() {
   $gateways['merchantone'] = array(
       'title' => t('Merchant One'),
       'description' => t('Process credit card payments using the HTTP-based API service of Merchant One.'),
@@ -169,6 +169,8 @@ function _uc_merchantone_charge($order, $amount, $data) {
   }
   curl_close($ch);
 
+  module_load_include("php", 'uc_merchantone', 'includes/classes/MerchantOneResponse.class');
+  
   $response = MerchantOneResponse::Parse($result);
 
   if (variable_get('uc_merchantone_response_debug', FALSE)) {
