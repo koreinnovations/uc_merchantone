@@ -70,37 +70,11 @@ function uc_merchantone_settings_form($form, &$form_state) {
   );
   $form['api_id_key']['uc_merchantone_transaction_url'] = array(
       '#type' => 'textfield',
-      '#title' => t('Authorize.net Live Gateway URL'),
+      '#title' => t('Merchant One Transaction POST URL'),
       '#default_value' => variable_get('uc_merchantone_transaction_url', UC_MERCHANTONE_LIVE_GATEWAY_URL),
   );
 
-
-
-
   return $form;
-}
-
-/**
- * Implements hook_form_FORM_ID_alter() for uc_payment_method_settings_form().
- */
-function uc_merchantone_form_uc_payment_method_settings_form_alter(&$form, &$form_state) {
-  if ($form_state['build_info']['args'][0] == 'credit') {
-    $form['#submit'][] = 'uc_merchantone_payment_gateway_settings_submit';
-  }
-}
-
-/**
- * Submit handler for payment gateway settings form to encrypt fields.
- */
-function uc_merchantone_payment_gateway_settings_submit($form, &$form_state) {
-  // If CC encryption has been configured properly.
-  if ($key = uc_credit_encryption_key()) {
-    // Setup our encryption object.
-    $crypt = new UbercartEncryption();
-
-    // Store any errors.
-    uc_store_encryption_errors($crypt, 'uc_merchantone');
-  }
 }
 
 /**
@@ -114,7 +88,7 @@ function uc_merchantone_charge($order_id, $amount, $data) {
 }
 
 /**
- * Handles authorizations and captures through AIM at Authorize.Net
+ * Handles authorizations and captures through Merchant One
  */
 function _uc_merchantone_charge($order, $amount, $data) {
   global $user;
@@ -193,55 +167,41 @@ function _uc_merchantone_charge($order, $amount, $data) {
   }
   curl_close($ch);
 
-  $response = explode('|', $result);
+  $response = MerchantOneResponse::Parse($result);
 
   if (variable_get('uc_merchantone_response_debug', FALSE)) {
-    watchdog('uc_merchantone', 'Debug response: !data', array('!data' => '<pre>' . check_plain(print_r($response, TRUE)) . '</pre>'));
+    $response->log();
   }
 
-  // Trim off the encapsulating character from the results.
-  for ($i = 0; $i < count($response); $i++) {
-    $response[$i] = substr($response[$i], 1, strlen($response[$i]) - 2);
-  }
-
-  /**
-   * Response key index:
-   * 0 = Response Code
-   * 2 = Response Reason Code
-   * 3 = Response Reason Text
-   * 4 = Authorization Code
-   * 5 = Address Verification Service (AVS) Response
-   * 6 = Transaction ID; needed for CREDIT, PRIOR_AUTH_CAPTURE, and VOID transactions.
-   * 9 = Amount
-   * 11 = Transaction Type
-   * 32 = Tax Amount Charged
-   * 37 = Transaction Response MD5 Hash
-   * 38 = Card Code (CVV) Response
-   */
   // If we didn't get an approval response code...
-  if ($response[0] != '1') {
+  if (!$response->isApproved()) {
     // Fail the charge with the reason text in the decline message.
     $result = array(
         'success' => FALSE,
-        'message' => t('Credit card payment declined: @message', array('@message' => $response[3])),
+        'message' => t('Credit card payment declined: @message', array('@message' => $response->responsetext)),
         'uid' => $user->uid,
     );
   }
   else {
     // Build a message for display and comments in the payments table.
-    $message = t('Type: @type<br />ID: @id', array('@type' => _uc_merchantone_txn_type($response[11]), '@id' => $response[6]));
+    $message = t('Transaction ID: @id<br />Auth Code: @code', array('@code' => $response->authcode, '@id' => $response->transactionid));
     $result = array(
         'success' => TRUE,
         'comment' => $message,
         'message' => $message,
-        'data' => array('module' => 'uc_merchantone', 'txn_type' => $response[11], 'txn_id' => $response[6], 'txn_authcode' => $response[4]),
+        'data' => array(
+            'module' => 'uc_merchantone',
+            'txn_type' => _uc_merchantone_txn_map($data['txn_type']),
+            'txn_id' => $response->transactionid,
+            'txn_authcode' => $response->authcode,
+        ),
         'uid' => $user->uid,
     );
 
     // If this was an authorization only transaction...
     if ($data['txn_type'] == UC_CREDIT_AUTH_ONLY) {
       // Log the authorization to the order.
-      uc_credit_log_authorization($order->order_id, $response[6], $amount);
+      uc_credit_log_authorization($order->order_id, $response->transactionid, $amount);
     }
     elseif ($data['txn_type'] == UC_CREDIT_PRIOR_AUTH_CAPTURE) {
       uc_credit_log_prior_auth_capture($order->order_id, $data['auth_id']);
@@ -254,11 +214,18 @@ function _uc_merchantone_charge($order, $amount, $data) {
   }
 
   // Build an admin order comment.
-  $comment = t('<b>@type</b><br /><b>@status:</b> @message<br />Amount: @amount<br />AVS response: @avs', array('@type' => _uc_merchantone_txn_type($response[11]), '@status' => $result['success'] ? t('ACCEPTED') : t('REJECTED'), '@message' => $response[3], '@amount' => uc_currency_format($response[9]), '@avs' => _uc_merchantone_avs($response[5])));
+  $comment = t('<b>@type</b><br /><b>@status:</b> @message<br />Amount: @amount<br />AVS response: @avs', array(
+      '@type' => _uc_merchantone_txn_map($data['txn_type']),
+      '@status' => $result['success'] ? t('ACCEPTED') : t('REJECTED'),
+      '@message' => $response->responsetext,
+      '@amount' => uc_currency_format($amount),
+      '@avs' => _uc_merchantone_avs($response->avsresponse),
+          )
+  );
 
   // Add the CVV response if enabled.
   if (variable_get('uc_credit_cvv_enabled', TRUE)) {
-    $comment .= '<br />' . t('CVV match: @cvv', array('@cvv' => _uc_merchantone_cvv($response[38])));
+    $comment .= '<br />' . t('CVV match: @cvv', array('@cvv' => _uc_merchantone_cvv($response->cvvresponse)));
   }
 
   // Save the comment to the order.
