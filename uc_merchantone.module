@@ -60,12 +60,12 @@ function uc_merchantone_settings_form($form, &$form_state) {
   );
   $form['api_id_key']['uc_merchantone_api_username'] = array(
       '#type' => 'textfield',
-      '#title' => t('API Login ID'),
+      '#title' => t('API Username'),
       '#default_value' => variable_get('uc_merchantone_api_username', ''),
   );
   $form['api_id_key']['uc_merchantone_api_password'] = array(
       '#type' => 'textfield',
-      '#title' => t('Transaction Key'),
+      '#title' => t('API Password'),
       '#default_value' => variable_get('uc_merchantone_api_password', ''),
   );
   $form['api_id_key']['uc_merchantone_transaction_url'] = array(
