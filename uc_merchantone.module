@@ -104,6 +104,9 @@ function _uc_merchantone_charge($order, $amount, $data) {
 
   dpm($order->payment_details);
   
+  $expiration = str_pad($order->payment_details['cc_exp_month'], 2) . substr($order->payment_details['cc_exp_year'], 2);
+  dpm($expiration);
+  
   // Build the POST data for the transaction.
   $submit_data = array(
       'payment' => 'creditcard',
