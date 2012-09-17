@@ -102,9 +102,7 @@ function _uc_merchantone_charge($order, $amount, $data) {
   $billing_country = uc_get_country_data(array('country_id' => $order->billing_country));
   $delivery_country = uc_get_country_data(array('country_id' => $order->delivery_country));
 
-  dpm($order->payment_details);
-  
-  $expiration = str_pad($order->payment_details['cc_exp_month'], 2) . substr($order->payment_details['cc_exp_year'], 2);
+  $expiration = str_pad($order->payment_details['cc_exp_month'], 2, '0', STR_PAD_LEFT) . substr($order->payment_details['cc_exp_year'], 2);
   dpm($expiration);
   
   // Build the POST data for the transaction.
